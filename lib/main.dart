@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'models/task.dart';
 import 'widgets/filter_dialog.dart';
 import 'screens/pomodoro_screen.dart';
+import 'screens/stats_screen.dart';
 
 void main() => runApp(const TrackifyApp());
 
@@ -23,16 +24,15 @@ class _TrackifyAppState extends State<TrackifyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Trackify',
-      theme: _isDarkMode 
-          ? ThemeData.dark().copyWith(useMaterial3: true)
-          : ThemeData.light().copyWith(
-              useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue,
-                brightness: Brightness.light,
-              ),
-            ),
-      darkTheme: ThemeData.dark().copyWith(
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
+        ),
+      ),
+      darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,
@@ -68,6 +68,24 @@ class _TaskListScreenState extends State<TaskListScreen> {
   String _selectedPriority = 'Medium';
   String? _filterCategory;
   String? _filterPriority;
+  DateTime? _selectedDueDate;
+
+  Future<void> _selectDueDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() => _selectedDueDate = picked);
+    }
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'No deadline';
+    return 'Due: ${date.day}/${date.month}/${date.year}';
+  }
 
   void _addTask() {
     if (_taskController.text.isEmpty) return;
@@ -79,9 +97,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
           title: _taskController.text,
           category: _selectedCategory,
           priority: _selectedPriority,
+          dueDate: _selectedDueDate,
         ),
       );
       _taskController.clear();
+      _selectedDueDate = null;
     });
   }
 
@@ -131,6 +151,15 @@ class _TaskListScreenState extends State<TaskListScreen> {
           IconButton(
             icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: widget.toggleTheme,
+          ),
+          IconButton(
+            icon: const Icon(Icons.analytics),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => StatsScreen(tasks: _tasks),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.timer),
@@ -206,6 +235,24 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _selectDueDate(context),
+                        child: Text(_selectedDueDate == null
+                            ? 'Set Due Date'
+                            : 'Due: ${_formatDate(_selectedDueDate)}'),
+                      ),
+                    ),
+                    if (_selectedDueDate != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => _selectedDueDate = null),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: _addTask,
                   child: const Text('Add Task'),
@@ -242,25 +289,38 @@ class _TaskListScreenState extends State<TaskListScreen> {
                       horizontal: 16, vertical: 4),
                   child: ListTile(
                     title: Text(task.title),
-                    subtitle: Row(
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: _getPriorityColor(task.priority)
-                                .withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            task.priority,
-                            style: TextStyle(
-                              color: _getPriorityColor(task.priority),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _getPriorityColor(task.priority)
+                                    .withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                task.priority,
+                                style: TextStyle(
+                                  color: _getPriorityColor(task.priority),
+                                ),
+                              ),
                             ),
+                            const SizedBox(width: 8),
+                            Text(task.category),
+                          ],
+                        ),
+                        Text(
+                          _formatDate(task.dueDate),
+                          style: TextStyle(
+                            color: task.dueDate?.isBefore(DateTime.now()) ?? false
+                                ? Colors.red
+                                : Theme.of(context).textTheme.bodySmall?.color,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(task.category),
                       ],
                     ),
                     leading: Checkbox(

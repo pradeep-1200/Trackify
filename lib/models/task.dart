@@ -3,6 +3,7 @@ class Task {
   final String title;
   final String category;
   final String priority;
+  final DateTime? dueDate;
   bool isCompleted;
 
   Task({
@@ -10,6 +11,7 @@ class Task {
     required this.title,
     required this.category,
     required this.priority,
+    this.dueDate,
     this.isCompleted = false,
   });
 }
