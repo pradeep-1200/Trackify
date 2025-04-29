@@ -1,26 +1,61 @@
 import 'package:flutter/material.dart';
 import 'models/task.dart';
+import 'widgets/filter_dialog.dart';
+import 'screens/pomodoro_screen.dart';
 
 void main() => runApp(const TrackifyApp());
 
-class TrackifyApp extends StatelessWidget {
+class TrackifyApp extends StatefulWidget {
   const TrackifyApp({super.key});
+
+  @override
+  State<TrackifyApp> createState() => _TrackifyAppState();
+}
+
+class _TrackifyAppState extends State<TrackifyApp> {
+  bool _isDarkMode = false;
+
+  void _toggleTheme() {
+    setState(() => _isDarkMode = !_isDarkMode);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Trackify',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+      theme: _isDarkMode 
+          ? ThemeData.dark().copyWith(useMaterial3: true)
+          : ThemeData.light().copyWith(
+              useMaterial3: true,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.blue,
+                brightness: Brightness.light,
+              ),
+            ),
+      darkTheme: ThemeData.dark().copyWith(
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
       ),
-      home: const TaskListScreen(),
+      home: TaskListScreen(
+        toggleTheme: _toggleTheme, 
+        isDarkMode: _isDarkMode,
+      ),
     );
   }
 }
 
 class TaskListScreen extends StatefulWidget {
-  const TaskListScreen({super.key});
+  final VoidCallback toggleTheme;
+  final bool isDarkMode;
+
+  const TaskListScreen({
+    super.key,
+    required this.toggleTheme,
+    required this.isDarkMode,
+  });
 
   @override
   State<TaskListScreen> createState() => _TaskListScreenState();
@@ -31,6 +66,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
   final _taskController = TextEditingController();
   String _selectedCategory = 'Assignment';
   String _selectedPriority = 'Medium';
+  String? _filterCategory;
+  String? _filterPriority;
 
   void _addTask() {
     if (_taskController.text.isEmpty) return;
@@ -61,6 +98,13 @@ class _TaskListScreenState extends State<TaskListScreen> {
     });
   }
 
+  void _applyFilters(String? category, String? priority) {
+    setState(() {
+      _filterCategory = category;
+      _filterPriority = priority;
+    });
+  }
+
   Color _getPriorityColor(String priority) {
     switch (priority) {
       case 'High': return Colors.red;
@@ -72,19 +116,46 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredTasks = _tasks.where((task) {
+      final categoryMatch = _filterCategory == null || 
+                          task.category == _filterCategory;
+      final priorityMatch = _filterPriority == null || 
+                          task.priority == _filterPriority;
+      return categoryMatch && priorityMatch;
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Study Tasks'),
         actions: [
           IconButton(
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            onPressed: widget.toggleTheme,
+          ),
+          IconButton(
+            icon: const Icon(Icons.timer),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PomodoroScreen(),
+              ),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.filter_alt),
-            onPressed: () {}, // We'll implement filters next
+            onPressed: () => showDialog(
+              context: context,
+              builder: (context) => FilterDialog(
+                onApply: _applyFilters,
+                currentCategory: _filterCategory,
+                currentPriority: _filterPriority,
+              ),
+            ),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Add Task Section
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -99,7 +170,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    // Category Dropdown
                     Expanded(
                       child: DropdownButtonFormField(
                         value: _selectedCategory,
@@ -117,7 +187,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // Priority Dropdown
                     Expanded(
                       child: DropdownButtonFormField(
                         value: _selectedPriority,
@@ -141,15 +210,33 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   onPressed: _addTask,
                   child: const Text('Add Task'),
                 ),
+                if (_filterCategory != null || _filterPriority != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        if (_filterCategory != null)
+                          Chip(
+                            label: Text('Category: $_filterCategory'),
+                            onDeleted: () => _applyFilters(null, _filterPriority),
+                          ),
+                        if (_filterPriority != null)
+                          Chip(
+                            label: Text('Priority: $_filterPriority'),
+                            onDeleted: () => _applyFilters(_filterCategory, null),
+                          ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
-          // Task List
           Expanded(
             child: ListView.builder(
-              itemCount: _tasks.length,
+              itemCount: filteredTasks.length,
               itemBuilder: (context, index) {
-                final task = _tasks[index];
+                final task = filteredTasks[index];
                 return Card(
                   margin: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 4),
