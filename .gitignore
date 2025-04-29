@@ -1,0 +1,10 @@
+# Flutter files
+/build/
+/.dart_tool/
+/android/
+/ios/
+/.idea/
+
+# System files
+.DS_Store
+*.log
